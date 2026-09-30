@@ -1,3 +1,4 @@
 - [x] Build the supplied dark animated portfolio layout with About, Projects, and Contact navigation.
 - [x] Replace sample project content with all twenty supplied projects and project-related visual references.
-- [ ] Connect a real contact destination (waiting for Ashwin's email address or preferred profile URL).
+- [x] Connect the supplied email and phone number on Contact.
+- [x] Add a home navigation option and distinct visuals and fuller descriptions for all twenty projects.
