@@ -11,3 +11,4 @@
 
 - Keep portfolio content in `src/lib/portfolio-data.ts` and render its showcase through `src/components/portfolio.tsx` so the home preview and projects page remain consistent.
 - Keep About, Projects, and Contact as separate TanStack routes while the home page previews those sections, so each page has a shareable URL.
+- Use one subject-specific image per portfolio project and keep imagery and descriptions in the shared project data, so home and Projects remain visually and factually aligned.

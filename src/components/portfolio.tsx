@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
 import { motion, useScroll, useTransform } from "framer-motion";
-import { ArrowDownRight, ArrowUpRight } from "lucide-react";
+import { ArrowDownRight, ArrowLeft, ArrowUpRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { imagery, projects } from "@/lib/portfolio-data";
 import portrait from "@/assets/portrait.png.asset.json";
@@ -22,6 +22,7 @@ export function ContactButton() {
 
 export function Nav({ className = "" }: { className?: string }) {
   return <nav aria-label="Main navigation" className={`relative z-30 flex items-center justify-between gap-3 px-6 pt-6 text-sm font-medium uppercase tracking-wider text-foreground md:px-10 md:pt-8 md:text-lg lg:text-[1.4rem] ${className}`}>
+    <Link to="/" aria-label="Back to home" title="Back to home" className="flex shrink-0 items-center gap-1 transition-opacity duration-200 hover:opacity-70"><ArrowLeft aria-hidden="true" className="size-4 md:size-5" /><span className="hidden sm:inline">Home</span></Link>
     <Link to="/about" className="transition-opacity duration-200 hover:opacity-70">About</Link>
     <Link to="/projects" className="transition-opacity duration-200 hover:opacity-70">Projects</Link>
     <Link to="/contact" className="transition-opacity duration-200 hover:opacity-70">Contact</Link>
@@ -58,7 +59,7 @@ export function Hero() {
   </header>;
 }
 
-const gallery = [imagery.january, imagery.robotics, imagery.tiger, imagery.iot, imagery.january, imagery.tiger, imagery.robotics, imagery.iot, imagery.january, imagery.robotics, imagery.tiger, imagery.iot, imagery.robotics, imagery.january, imagery.tiger, imagery.iot, imagery.robotics, imagery.january, imagery.iot, imagery.tiger, imagery.robotics];
+const gallery = projects.map((project) => project.image);
 
 export function Marquee() {
   const ref = useRef<HTMLElement>(null);
@@ -69,7 +70,7 @@ export function Marquee() {
     return () => { window.removeEventListener("scroll", update); window.removeEventListener("resize", update); };
   }, []);
   return <section ref={ref} aria-label="Project imagery" className="overflow-hidden bg-background pt-24 pb-10 sm:pt-32 md:pt-40">
-    {[gallery.slice(0, 11), gallery.slice(11)].map((row, ri) => <div key={ri} className="mb-3 flex w-max gap-3" style={{ transform: `translateX(${ri === 0 ? offset - 200 - 4600 : -(offset - 200)}px)`, willChange: "transform" }} aria-hidden="true">{[...row, ...row, ...row].map((src, i) => <img key={i} src={src} alt="" loading="lazy" width={420} height={270} className="h-[270px] w-[420px] shrink-0 rounded-2xl object-cover" />)}</div>)}
+    {[gallery.slice(0, 10), gallery.slice(10)].map((row, ri) => <div key={ri} className="mb-3 flex w-max gap-3" style={{ transform: `translateX(${ri === 0 ? offset - 200 - 4600 : -(offset - 200)}px)`, willChange: "transform" }} aria-hidden="true">{[...row, ...row, ...row].map((src, i) => <img key={i} src={src} alt="" loading="lazy" width={420} height={270} className="h-[270px] w-[420px] shrink-0 rounded-2xl object-cover" />)}</div>)}
   </section>;
 }
 
