@@ -49,7 +49,7 @@ function Magnet({ children }: { children: ReactNode }) {
 export function Hero() {
   return <header className="relative flex h-screen min-h-[590px] flex-col overflow-hidden bg-background">
     <FadeIn y={-20}><Nav /></FadeIn>
-    <div className="relative z-0 mt-6 w-full overflow-hidden sm:mt-4 md:-mt-5"><FadeIn delay={0.15} y={40}><h1 className="hero-heading w-full whitespace-nowrap text-center text-[14vw] font-black uppercase leading-none sm:text-[15vw] md:text-[16vw] lg:text-[17.5vw]">Hi, i'm Ashwin</h1></FadeIn></div>
+    <div className="relative z-0 mt-6 w-full overflow-hidden sm:mt-4 md:-mt-5"><FadeIn delay={0.15} y={40}><h1 className="hero-heading w-full whitespace-nowrap text-center text-[9vw] font-black uppercase leading-none">Hi, i'm Ashwin</h1></FadeIn></div>
     <div className="pointer-events-none absolute left-1/2 top-1/2 z-10 w-[280px] -translate-x-1/2 -translate-y-1/2 sm:top-auto sm:bottom-0 sm:w-[360px] sm:translate-y-0 md:w-[440px] lg:w-[520px]"><FadeIn delay={0.6} y={30}><Magnet><img src={portrait.url} alt="Ashwin portfolio portrait" className="h-auto w-full object-contain" /></Magnet></FadeIn></div>
     <div className="relative z-20 mt-auto flex items-end justify-between gap-4 px-6 pb-7 sm:pb-8 md:px-10 md:pb-10">
       <FadeIn delay={0.35} y={20}><p className="max-w-[160px] text-[clamp(.75rem,1.4vw,1.5rem)] font-light uppercase leading-snug tracking-wide text-foreground sm:max-w-[220px] md:max-w-[260px]">An AI and robotics engineer driven by building intelligent systems</p></FadeIn>
@@ -94,7 +94,7 @@ export function AboutSection({ full = false }: { full?: boolean }) {
     <FadeIn delay={0.25} x={-80} y={0} className="pointer-events-none absolute bottom-[8%] left-[3%] w-[100px] sm:left-[6%] sm:w-[140px] md:left-[10%] md:w-[180px]"><img src={object.url} alt="" className="w-full" /></FadeIn>
     <FadeIn delay={0.15} x={80} y={0} className="pointer-events-none absolute top-[4%] right-[1%] w-[120px] sm:right-[2%] sm:w-[160px] md:right-[4%] md:w-[210px]"><img src={lego.url} alt="" className="w-full" /></FadeIn>
     <FadeIn delay={0.3} x={80} y={0} className="pointer-events-none absolute right-[3%] bottom-[8%] w-[130px] sm:right-[6%] sm:w-[170px] md:right-[10%] md:w-[220px]"><img src={group.url} alt="" className="w-full" /></FadeIn>
-    <div className="relative z-10 flex flex-col items-center gap-10 sm:gap-14 md:gap-16"><FadeIn y={40}><h2 className="hero-heading text-center text-[clamp(3rem,12vw,160px)] font-black uppercase leading-none">About me</h2></FadeIn><AnimatedText text={aboutText} />
+    <div className="relative z-10 flex flex-col items-center gap-10 sm:gap-14 md:gap-16"><FadeIn y={40}>{full ? <h1 className="hero-heading text-center text-[clamp(3rem,12vw,160px)] font-black uppercase leading-none">About me</h1> : <h2 className="hero-heading text-center text-[clamp(3rem,12vw,160px)] font-black uppercase leading-none">About me</h2>}</FadeIn><AnimatedText text={aboutText} />
       {full && <FadeIn className="mx-auto max-w-[560px] text-center text-lg font-light leading-relaxed text-foreground">Across personal, academic and industry projects, I have worked on AI-powered software, embedded sensing, robotic control, computer vision research and production-ready applications.</FadeIn>}
       <FadeIn className="mt-6 sm:mt-8 md:mt-10"><ContactButton /></FadeIn></div>
   </section>;
