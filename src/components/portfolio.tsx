@@ -3,7 +3,7 @@ import { Link } from "@tanstack/react-router";
 import { motion, useScroll, useTransform } from "framer-motion";
 import { ArrowDownRight, ArrowLeft, ArrowUpRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { imagery, projects } from "@/lib/portfolio-data";
+import { projects } from "@/lib/portfolio-data";
 import portrait from "@/assets/portrait.png.asset.json";
 import moon from "@/assets/moon.png.asset.json";
 import object from "@/assets/object.png.asset.json";
