@@ -8,3 +8,6 @@
 > Commits you push to the connected branch sync back to Lovable and show up in
 > the editor, so keep the branch in a working state.
 <!-- LOVABLE:END -->
+
+- Keep portfolio content in `src/lib/portfolio-data.ts` and render its showcase through `src/components/portfolio.tsx` so the home preview and projects page remain consistent.
+- Keep About, Projects, and Contact as separate TanStack routes while the home page previews those sections, so each page has a shareable URL.
