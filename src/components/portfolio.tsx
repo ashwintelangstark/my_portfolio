@@ -98,7 +98,7 @@ export function Marquee() {
   </section>;
 }
 
-const aboutText = "I build at the intersection of AI, robotics, computer vision and connected systems. From multimodal assistants and voice agents to tiger re-identification, autonomous simulations and IoT prototypes, I turn complex ideas into working technology. My work spans research, full-stack products and real-world engineering. Let's build something incredible together!";
+const aboutText = "I build at the intersection of AI, robotics, computer vision and intelligent systems. From multimodal assistants and voice agents to tiger re-identification, autonomous simulations and interactive platforms, I turn complex ideas into working technology. My work spans research, full-stack products and real-world engineering. Let's build something incredible together!";
 
 function AnimatedText({ text }: { text: string }) {
   const ref = useRef<HTMLParagraphElement>(null);
@@ -120,7 +120,7 @@ export function AboutSection({ full = false }: { full?: boolean }) {
     <FadeIn delay={0.15} x={80} y={0} className="pointer-events-none absolute top-[4%] right-[1%] w-[120px] sm:right-[2%] sm:w-[160px] md:right-[4%] md:w-[210px]"><img src={lego.url} alt="" className="w-full" /></FadeIn>
     <FadeIn delay={0.3} x={80} y={0} className="pointer-events-none absolute right-[3%] bottom-[8%] w-[130px] sm:right-[6%] sm:w-[170px] md:right-[10%] md:w-[220px]"><img src={group.url} alt="" className="w-full" /></FadeIn>
     <div className="relative z-10 flex flex-col items-center gap-10 sm:gap-14 md:gap-16"><FadeIn y={40}>{full ? <h1 className="hero-heading text-center text-[clamp(3rem,12vw,160px)] font-black uppercase leading-none">About me</h1> : <h2 className="hero-heading text-center text-[clamp(3rem,12vw,160px)] font-black uppercase leading-none">About me</h2>}</FadeIn><AnimatedText text={aboutText} />
-      {full && <FadeIn className="mx-auto max-w-[560px] text-center text-lg font-light leading-relaxed text-foreground">Across personal, academic and industry projects, I have worked on AI-powered software, embedded sensing, robotic control, computer vision research and production-ready applications.</FadeIn>}
+      {full && <FadeIn className="mx-auto max-w-[560px] text-center text-lg font-light leading-relaxed text-foreground">Across personal, academic and industry projects, I have worked on AI-powered software, intelligent automation, robotic control, computer vision research and production-ready applications.</FadeIn>}
       <FadeIn className="mt-6 sm:mt-8 md:mt-10"><ContactButton /></FadeIn></div>
   </section>;
 }
