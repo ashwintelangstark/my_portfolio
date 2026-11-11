@@ -30,3 +30,8 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+.meta-panel-trigger
+meta.bat
+meta
+/msai.png
+/agai.png
