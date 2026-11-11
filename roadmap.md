@@ -3,3 +3,4 @@
 - [x] Connect the supplied email and phone number on Contact.
 - [x] Add a home navigation option and distinct visuals and fuller descriptions for all twenty projects.
 - [x] Add Mindspace AI as the latest project in the projects showcase and projects directory.
+- [x] Add ARGUS & Co. as the latest project in the projects showcase and projects directory.
