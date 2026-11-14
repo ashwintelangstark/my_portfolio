@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { projects } from "@/lib/portfolio-data";
 import { technicalCertificates, awardsList } from "@/lib/awards-data";
 import portrait from "@/assets/ashwin-portrait.png";
+import { Hero3DCharacter } from "@/components/hero-3d-character";
 import moon from "@/assets/moon.png.asset.json";
 import object from "@/assets/object.png.asset.json";
 import lego from "@/assets/lego.png.asset.json";
@@ -77,7 +78,7 @@ export function Hero() {
   return <header className="relative flex h-screen min-h-[590px] flex-col overflow-hidden bg-background">
     <FadeIn y={-20}><Nav /></FadeIn>
     <div className="relative z-0 mt-6 w-full overflow-hidden sm:mt-4 md:-mt-5"><FadeIn delay={0.15} y={40}><h1 className="hero-heading w-full whitespace-nowrap text-center text-[9vw] font-black uppercase leading-none">Hi, i'm Ashwin</h1></FadeIn></div>
-    <div className="pointer-events-none absolute left-1/2 top-1/2 z-10 w-[280px] -translate-x-1/2 -translate-y-1/2 sm:top-auto sm:bottom-0 sm:w-[360px] sm:translate-y-0 md:w-[440px] lg:w-[520px]"><FadeIn delay={0.6} y={30}><Magnet><img src={portrait} alt="Ashwin portfolio portrait" className="h-auto w-full object-contain" /></Magnet></FadeIn></div>
+    <div className="pointer-events-auto absolute left-1/2 top-1/2 z-10 w-[364px] -translate-x-1/2 -translate-y-1/2 sm:top-auto sm:bottom-0 sm:w-[468px] sm:translate-y-0 md:w-[572px] lg:w-[676px]"><FadeIn delay={0.6} y={30}><Hero3DCharacter /></FadeIn></div>
     <div className="relative z-20 mt-auto flex items-end justify-between gap-4 px-6 pb-7 sm:pb-8 md:px-10 md:pb-10">
       <FadeIn delay={0.35} y={20}><p className="max-w-[160px] text-[clamp(.75rem,1.4vw,1.5rem)] font-light uppercase leading-snug tracking-wide text-foreground sm:max-w-[220px] md:max-w-[260px]">An AI and robotics engineer driven by building intelligent systems</p></FadeIn>
       <FadeIn delay={0.5} y={20}><ContactButton /></FadeIn>
