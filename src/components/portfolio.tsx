@@ -147,6 +147,8 @@ export function ProjectIndex() {
 }
 
 export function AwardsSection({ full = false }: { full?: boolean }) {
+  const displayedCertificates = full ? technicalCertificates : technicalCertificates.slice(0, 4);
+
   return (
     <section id="awards" className="relative z-10 bg-background px-5 py-20 text-foreground sm:px-8 sm:py-24 md:px-10 md:py-32">
       <div className="mx-auto max-w-7xl">
@@ -155,9 +157,15 @@ export function AwardsSection({ full = false }: { full?: boolean }) {
             <span className="mb-3 block text-xs font-semibold uppercase tracking-widest text-foreground/60 sm:text-sm">
               Recognition · Technical Credentials · Literary Honours
             </span>
-            <h2 className="hero-heading text-[clamp(2.5rem,8vw,120px)] font-black uppercase leading-none text-white">
-              Awards & Certifications
-            </h2>
+            {full ? (
+              <h1 className="hero-heading text-[clamp(2.5rem,8vw,120px)] font-black uppercase leading-none text-white">
+                Awards & Certifications
+              </h1>
+            ) : (
+              <h2 className="hero-heading text-[clamp(2.5rem,8vw,120px)] font-black uppercase leading-none text-white">
+                Awards & Certifications
+              </h2>
+            )}
             <p className="mx-auto mt-6 max-w-3xl text-sm font-light leading-relaxed text-foreground/80 sm:text-base md:text-lg">
               A dual showcase of professional AI certifications from Anthropic's Claude Academy—reflecting agentic engineering, model evaluation, and tool integration—alongside published literature awards and global readership recognitions.
             </p>
@@ -165,7 +173,7 @@ export function AwardsSection({ full = false }: { full?: boolean }) {
         </FadeIn>
 
         {/* Technical Certifications */}
-        <div id="technical-certifications" className="mb-24 scroll-mt-12 sm:mb-32">
+        <div id="technical-certifications" className={full ? "mb-24 scroll-mt-12 sm:mb-32" : "scroll-mt-12"}>
           <FadeIn>
             <div className="mb-10 flex flex-wrap items-end justify-between gap-4 border-b border-border pb-6">
               <div>
@@ -177,13 +185,15 @@ export function AwardsSection({ full = false }: { full?: boolean }) {
                 </h3>
               </div>
               <span className="rounded-full border border-border px-4 py-1.5 text-xs font-medium uppercase tracking-wider text-foreground/70">
-                20 Technical Certifications
+                {full
+                  ? `${technicalCertificates.length} Technical Certifications`
+                  : `4 of ${technicalCertificates.length} Technical Certifications`}
               </span>
             </div>
           </FadeIn>
 
           <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
-            {technicalCertificates.map((cert, index) => (
+            {displayedCertificates.map((cert, index) => (
               <FadeIn key={cert.id} delay={Math.min(index * 0.03, 0.25)}>
                 <article className="flex h-full flex-col justify-between rounded-[32px] border border-border bg-card/40 p-6 sm:p-8 transition-colors duration-200 hover:border-foreground/40">
                   <div>
@@ -227,7 +237,8 @@ export function AwardsSection({ full = false }: { full?: boolean }) {
         </div>
 
         {/* Honours & Awards (Alphabetical) */}
-        <div id="honours-awards" className="scroll-mt-12">
+        {full ? (
+          <div id="honours-awards" className="scroll-mt-12">
           <FadeIn>
             <div className="mb-10 flex flex-wrap items-end justify-between gap-4 border-b border-border pb-6">
               <div>
@@ -319,6 +330,13 @@ export function AwardsSection({ full = false }: { full?: boolean }) {
             ))}
           </div>
         </div>
+        ) : (
+          <div className="mt-12 text-center">
+            <Button asChild variant="project" className="h-auto rounded-full px-10 py-4 uppercase tracking-widest">
+              <Link to="/awards">Show all <ArrowDownRight aria-hidden="true" /></Link>
+            </Button>
+          </div>
+        )}
       </div>
     </section>
   );

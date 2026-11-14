@@ -1,34 +1,40 @@
+import { Component, type ErrorInfo, type ReactNode, useEffect, useRef, useState } from "react";
 import * as THREE from "three";
-import { useEffect, useRef, useState, useCallback, Component, type ReactNode, type ErrorInfo } from "react";
 import frontPortrait from "@/assets/ashwin-portrait.png";
 import backPortrait from "@/assets/ashwin-portrait-back.png";
-import { Rotate3D, RotateCcw } from "lucide-react";
 
-// Robust Error Boundary to guarantee the website never goes blank
-interface ErrorBoundaryProps {
-  children: ReactNode;
-  fallback: ReactNode;
+// Supports checking WebGL availability safely before initializing Three.js
+function isWebGLSupported(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    const canvas = document.createElement("canvas");
+    return !!(
+      window.WebGLRenderingContext &&
+      (canvas.getContext("webgl") || canvas.getContext("experimental-webgl"))
+    );
+  } catch {
+    return false;
+  }
 }
 
-interface ErrorBoundaryState {
-  hasError: boolean;
-}
-
-class ThreeErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
-  constructor(props: ErrorBoundaryProps) {
+class ThreeErrorBoundary extends Component<
+  { fallback: ReactNode; children: ReactNode },
+  { hasError: boolean }
+> {
+  constructor(props: { fallback: ReactNode; children: ReactNode }) {
     super(props);
     this.state = { hasError: false };
   }
 
-  static getDerivedStateFromError() {
+  static getDerivedStateFromError(): { hasError: boolean } {
     return { hasError: true };
   }
 
-  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.warn("Hero3DCharacter caught error, falling back:", error, errorInfo);
+  override componentDidCatch(error: Error, info: ErrorInfo) {
+    console.warn("Hero3DCharacter WebGL fallback activated:", error, info);
   }
 
-  render() {
+  override render() {
     if (this.state.hasError) {
       return this.props.fallback;
     }
@@ -36,499 +42,564 @@ class ThreeErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryStat
   }
 }
 
-function InnerHero3DCharacter() {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [isClient, setIsClient] = useState(false);
-  const [webglAvailable, setWebglAvailable] = useState(true);
-  const [isReady, setIsReady] = useState(false);
-  const [isInteracting, setIsInteracting] = useState(false);
-  const [hasRotated, setHasRotated] = useState(false);
-  const [currentYawDeg, setCurrentYawDeg] = useState(0);
+interface ReliefAnalysis {
+  heightGrid: Float32Array;
+  gridSize: number;
+  centerXNorm: number;
+}
 
-  // References to communicate with the Three.js animation loop
-  const sceneStateRef = useRef<{
-    resetToFront?: () => void;
-  }>({});
+/**
+ * Analyzes a transparent PNG portrait on an offscreen canvas to build a
+ * smoothed 3D depth relief heightmap. Exterior pixels sink slightly behind
+ * z = 0 so the front and rear shells overlap cleanly at the silhouette seam
+ * with zero facial occlusion from any viewing angle.
+ */
+function analyzePortraitRelief(
+  img: HTMLImageElement,
+  gridSize = 96,
+  maxHeadDepth = 0.56,
+  maxTorsoDepth = 0.34,
+): ReliefAnalysis | null {
+  const analysisRes = 256;
+  const canvas = document.createElement("canvas");
+  canvas.width = analysisRes;
+  canvas.height = analysisRes;
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  if (!ctx) return null;
+
+  ctx.clearRect(0, 0, analysisRes, analysisRes);
+  ctx.drawImage(img, 0, 0, analysisRes, analysisRes);
+  const { data } = ctx.getImageData(0, 0, analysisRes, analysisRes);
+
+  const mask = new Uint8Array(analysisRes * analysisRes);
+  const rowMinX = new Int16Array(analysisRes).fill(analysisRes);
+  const rowMaxX = new Int16Array(analysisRes).fill(-1);
+  let sumX = 0;
+  let count = 0;
+
+  for (let y = 0; y < analysisRes; y++) {
+    const rowOff = y * analysisRes;
+    for (let x = 0; x < analysisRes; x++) {
+      const a = data[(rowOff + x) * 4 + 3] ?? 0;
+      if (a > 24) {
+        mask[rowOff + x] = 1;
+        if (x < (rowMinX[y] ?? analysisRes)) rowMinX[y] = x;
+        if (x > (rowMaxX[y] ?? -1)) rowMaxX[y] = x;
+        sumX += x;
+        count++;
+      }
+    }
+  }
+
+  if (count === 0) return null;
+  const centerXNorm = sumX / count / analysisRes;
+
+  // 2-pass Chamfer 3-4 Euclidean distance transform inside the opaque mask
+  const INF = 1e6;
+  const dist = new Float32Array(analysisRes * analysisRes);
+  for (let i = 0; i < dist.length; i++) {
+    dist[i] = mask[i] ? INF : 0;
+  }
+
+  for (let y = 0; y < analysisRes; y++) {
+    for (let x = 0; x < analysisRes; x++) {
+      const idx = y * analysisRes + x;
+      let d = dist[idx] ?? INF;
+      if (d === 0) continue;
+      if (x > 0) d = Math.min(d, (dist[idx - 1] ?? INF) + 3);
+      if (y > 0) {
+        d = Math.min(d, (dist[idx - analysisRes] ?? INF) + 3);
+        if (x > 0) d = Math.min(d, (dist[idx - analysisRes - 1] ?? INF) + 4);
+        if (x < analysisRes - 1) d = Math.min(d, (dist[idx - analysisRes + 1] ?? INF) + 4);
+      }
+      dist[idx] = d;
+    }
+  }
+
+  for (let y = analysisRes - 1; y >= 0; y--) {
+    for (let x = analysisRes - 1; x >= 0; x--) {
+      const idx = y * analysisRes + x;
+      let d = dist[idx] ?? INF;
+      if (d === 0) continue;
+      if (x < analysisRes - 1) d = Math.min(d, (dist[idx + 1] ?? INF) + 3);
+      if (y < analysisRes - 1) {
+        d = Math.min(d, (dist[idx + analysisRes] ?? INF) + 3);
+        if (x > 0) d = Math.min(d, (dist[idx + analysisRes - 1] ?? INF) + 4);
+        if (x < analysisRes - 1) d = Math.min(d, (dist[idx + analysisRes + 1] ?? INF) + 4);
+      }
+      dist[idx] = d;
+    }
+  }
+
+  // Convert Chamfer units (3 per pixel) into pixel-based rounded depth
+  const bevelRadius = 32; // pixels for smooth rounded side/top silhouette bevel
+  const seamOverlap = 0.022;
+  const raw = new Float32Array(analysisRes * analysisRes);
+
+  const smoothstep = (edge0: number, edge1: number, x: number) => {
+    const t = Math.max(0, Math.min(1, (x - edge0) / (edge1 - edge0)));
+    return t * t * (3 - 2 * t);
+  };
+
+  for (let y = 0; y < analysisRes; y++) {
+    const v = y / (analysisRes - 1);
+    const minX = rowMinX[y] ?? analysisRes;
+    const maxX = rowMaxX[y] ?? -1;
+    const rowCx = (minX + maxX) * 0.5;
+    const rowHalfW = Math.max(1, (maxX - minX) * 0.5);
+
+    // Chibi head occupies top ~60%, blending smoothly into slightly flatter suit torso
+    const headToTorso = smoothstep(0.56, 0.72, v);
+    const regionMaxDepth = maxHeadDepth * (1 - headToTorso) + maxTorsoDepth * headToTorso;
+
+    for (let x = 0; x < analysisRes; x++) {
+      const idx = y * analysisRes + x;
+      if (!mask[idx]) {
+        raw[idx] = -seamOverlap;
+        continue;
+      }
+
+      const pxDist = (dist[idx] ?? 0) / 3;
+      const edgeNorm = Math.min(1, pxDist / bevelRadius);
+      const bevel = Math.sin(edgeNorm * Math.PI * 0.5);
+
+      const dx = (x - rowCx) / rowHalfW;
+      const chordBulge = Math.sqrt(Math.max(0, 1 - dx * dx));
+      const dome = 0.58 + 0.42 * chordBulge;
+
+      raw[idx] = -seamOverlap + bevel * dome * (regionMaxDepth + seamOverlap);
+    }
+  }
+
+  // Sample onto (gridSize + 1) x (gridSize + 1) mesh vertices with local smoothing
+  const vertsPerSide = gridSize + 1;
+  const sampled = new Float32Array(vertsPerSide * vertsPerSide);
+  for (let gy = 0; gy < vertsPerSide; gy++) {
+    const py = Math.round((gy / gridSize) * (analysisRes - 1));
+    for (let gx = 0; gx < vertsPerSide; gx++) {
+      const px = Math.round((gx / gridSize) * (analysisRes - 1));
+      sampled[gy * vertsPerSide + gx] = raw[py * analysisRes + px] ?? -seamOverlap;
+    }
+  }
+
+  // 2 passes of 3x3 box smoothing so lighting gradients across curved head/hair are silky
+  let curr = sampled;
+  for (let pass = 0; pass < 2; pass++) {
+    const next = new Float32Array(curr.length);
+    for (let gy = 0; gy < vertsPerSide; gy++) {
+      for (let gx = 0; gx < vertsPerSide; gx++) {
+        let sum = 0;
+        let n = 0;
+        for (let oy = -1; oy <= 1; oy++) {
+          const ny = gy + oy;
+          if (ny < 0 || ny >= vertsPerSide) continue;
+          for (let ox = -1; ox <= 1; ox++) {
+            const nx = gx + ox;
+            if (nx < 0 || nx >= vertsPerSide) continue;
+            sum += curr[ny * vertsPerSide + nx] ?? 0;
+            n++;
+          }
+        }
+        next[gy * vertsPerSide + gx] = sum / n;
+      }
+    }
+    curr = next;
+  }
+
+  return {
+    heightGrid: curr,
+    gridSize,
+    centerXNorm,
+  };
+}
+
+function applyReliefToPlaneGeometry(
+  geo: THREE.PlaneGeometry,
+  relief: ReliefAnalysis,
+  planeH: number,
+  planeW: number,
+) {
+  const posAttr = geo.attributes["position"] as THREE.BufferAttribute;
+  const vertsPerSide = relief.gridSize + 1;
+  const total = vertsPerSide * vertsPerSide;
+  if (posAttr.count !== total) return;
+
+  for (let gy = 0; gy < vertsPerSide; gy++) {
+    for (let gx = 0; gx < vertsPerSide; gx++) {
+      const idx = gy * vertsPerSide + gx;
+      const u = gx / relief.gridSize;
+      const v = gy / relief.gridSize;
+      posAttr.setXYZ(
+        idx,
+        (u - 0.5) * planeW,
+        (0.5 - v) * planeH,
+        relief.heightGrid[idx] ?? 0,
+      );
+    }
+  }
+  posAttr.needsUpdate = true;
+  geo.computeVertexNormals();
+}
+
+export function Hero3DCharacter() {
+  const [canWebGL, setCanWebGL] = useState<boolean | null>(null);
 
   useEffect(() => {
-    setIsClient(true);
+    setCanWebGL(isWebGLSupported());
   }, []);
 
+  const fallback2D = (
+    <div className="relative flex w-full select-none flex-col items-center">
+      <div className="relative aspect-square w-full max-w-[676px] overflow-hidden">
+        <img
+          src={frontPortrait}
+          alt="Illustrated portrait of Ashwin in a dark suit"
+          className="h-full w-full object-contain drop-shadow-[0_20px_50px_rgba(120,80,255,0.2)]"
+        />
+      </div>
+    </div>
+  );
+
+  if (canWebGL === false) {
+    return fallback2D;
+  }
+
+  return (
+    <ThreeErrorBoundary fallback={fallback2D}>
+      <InnerHero3DCharacter fallback={fallback2D} />
+    </ThreeErrorBoundary>
+  );
+}
+
+function InnerHero3DCharacter({ fallback }: { fallback: ReactNode }) {
+  const mountRef = useRef<HTMLDivElement>(null);
+  const [hasFailed, setHasFailed] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const [hasInteracted, setHasInteracted] = useState(false);
+  const [angleLabel, setAngleLabel] = useState("Front");
+
+  // Interactive rotation state stored in refs for silky 60fps animation loop
+  const rotY = useRef(0);
+  const rotX = useRef(0.05);
+  const velY = useRef(0);
+  const velX = useRef(0);
+  const pointerDown = useRef(false);
+  const lastX = useRef(0);
+  const lastY = useRef(0);
+
   useEffect(() => {
-    if (!isClient || !containerRef.current || !canvasRef.current) return;
-
-    const container = containerRef.current;
-    const canvas = canvasRef.current;
-
-    // Check if WebGL is supported by the browser (handles Brave shields / strict privacy)
-    try {
-      const testCanvas = document.createElement("canvas");
-      const gl = testCanvas.getContext("webgl") || testCanvas.getContext("experimental-webgl");
-      if (!gl) {
-        console.warn("WebGL is disabled or unsupported in this browser.");
-        setWebglAvailable(false);
-        return;
-      }
-    } catch {
-      setWebglAvailable(false);
-      return;
-    }
+    const container = mountRef.current;
+    if (!container) return;
 
     let renderer: THREE.WebGLRenderer;
     try {
       renderer = new THREE.WebGLRenderer({
-        canvas,
-        alpha: true,
         antialias: true,
+        alpha: true,
         powerPreference: "high-performance",
       });
     } catch (e) {
-      console.warn("Failed to create WebGLRenderer:", e);
-      setWebglAvailable(false);
+      console.warn("WebGLRenderer init failed, using 2D fallback", e);
+      setHasFailed(true);
       return;
     }
 
-    // 1. Scene & Camera setup
     const scene = new THREE.Scene();
-    const width = container.clientWidth || 400;
-    const height = container.clientHeight || 400;
 
-    const camera = new THREE.PerspectiveCamera(38, width / height, 0.1, 100);
-    camera.position.set(0, -0.05, 5.2);
+    const getWidth = () => Math.max(container.clientWidth || 400, 1);
+    const getHeight = () => Math.max(container.clientHeight || 400, 1);
+
+    const camera = new THREE.PerspectiveCamera(34, getWidth() / getHeight(), 0.1, 100);
+    camera.position.set(0, 0.08, 6.4);
 
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-    renderer.setSize(width, height);
-    renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.15;
+    renderer.setSize(getWidth(), getHeight());
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.setClearColor(0x000000, 0);
+    container.innerHTML = "";
+    container.appendChild(renderer.domElement);
 
-    // 2. Lighting setup
-    const ambientLight = new THREE.AmbientLight(0xffffff, 1.3);
+    // Studio Lighting (balanced so artwork colors stay crisp while 3D contours catch soft highlights)
+    const ambientLight = new THREE.AmbientLight(0xffffff, 2.05);
     scene.add(ambientLight);
 
-    // Key light (front top-right)
-    const keyLight = new THREE.DirectionalLight(0xffffff, 2.2);
-    keyLight.position.set(2.5, 3.5, 4.0);
+    const keyLight = new THREE.DirectionalLight(0xfff5ec, 1.15);
+    keyLight.position.set(3.2, 4.5, 5.5);
     scene.add(keyLight);
 
-    // Front fill light (cool soft white)
-    const fillLight = new THREE.DirectionalLight(0xe0e7ff, 1.2);
-    fillLight.position.set(-2.5, 1.5, 3.0);
+    const fillLight = new THREE.DirectionalLight(0xc2d8ff, 0.75);
+    fillLight.position.set(-4.0, 1.5, 4.0);
     scene.add(fillLight);
 
-    // Back rim light 1 (noir cyan-blue)
-    const backRimLight1 = new THREE.DirectionalLight(0x60a5fa, 1.8);
-    backRimLight1.position.set(-3.0, 2.5, -3.5);
-    scene.add(backRimLight1);
+    const rimLight = new THREE.DirectionalLight(0x9b7dff, 1.1);
+    rimLight.position.set(0, 3.0, -5.0);
+    scene.add(rimLight);
 
-    // Back rim light 2 (noir violet-purple)
-    const backRimLight2 = new THREE.DirectionalLight(0xa855f7, 1.6);
-    backRimLight2.position.set(3.0, 2.0, -3.5);
-    scene.add(backRimLight2);
+    const accentLeft = new THREE.PointLight(0xbc28fe, 0.85, 14);
+    accentLeft.position.set(-3.2, -0.5, 2.5);
+    scene.add(accentLeft);
 
-    // 3. Character Hierarchy
+    const accentRight = new THREE.PointLight(0x1f62fe, 0.85, 14);
+    accentRight.position.set(3.2, 0.5, -2.5);
+    scene.add(accentRight);
+
+    // Master Pivot Group for 360° Horizontal + Pitch Rotation
     const characterRoot = new THREE.Group();
     scene.add(characterRoot);
 
-    // Texture loader
-    const textureLoader = new THREE.TextureLoader();
+    const planeW = 3.5;
+    const planeH = 3.5;
+    const gridSegs = 96;
 
-    // Front Portrait Texture
-    const frontTex = textureLoader.load(frontPortrait, () => {
-      setIsReady(true);
-      renderer.render(scene, camera);
-    });
-    frontTex.colorSpace = THREE.SRGBColorSpace;
-    frontTex.generateMipmaps = true;
-    frontTex.minFilter = THREE.LinearMipmapLinearFilter;
-    frontTex.magFilter = THREE.LinearFilter;
+    const frontGeo = new THREE.PlaneGeometry(planeW, planeH, gridSegs, gridSegs);
+    const backGeo = new THREE.PlaneGeometry(planeW, planeH, gridSegs, gridSegs);
 
-    // Back Portrait Texture
-    const backTex = textureLoader.load(backPortrait, () => {
-      renderer.render(scene, camera);
-    });
-    backTex.colorSpace = THREE.SRGBColorSpace;
-    backTex.generateMipmaps = true;
-    backTex.minFilter = THREE.LinearMipmapLinearFilter;
-    backTex.magFilter = THREE.LinearFilter;
-
-    const planeW = 3.6;
-    const planeH = 3.6;
-    const halfDepth = 0.14; // distance from center for front/back planes
-
-    // Front Mesh
-    const frontGeo = new THREE.PlaneGeometry(planeW, planeH);
     const frontMat = new THREE.MeshStandardMaterial({
-      map: frontTex,
       transparent: true,
-      alphaTest: 0.05,
-      roughness: 0.5,
-      metalness: 0.1,
+      alphaTest: 0.12,
+      roughness: 0.68,
+      metalness: 0.04,
       side: THREE.FrontSide,
     });
+
+    const backMat = new THREE.MeshStandardMaterial({
+      transparent: true,
+      alphaTest: 0.12,
+      roughness: 0.72,
+      metalness: 0.04,
+      side: THREE.FrontSide,
+    });
+
     const frontMesh = new THREE.Mesh(frontGeo, frontMat);
-    frontMesh.position.set(0, 0, halfDepth);
     characterRoot.add(frontMesh);
 
-    // Back Mesh (Facing rear)
-    const backGeo = new THREE.PlaneGeometry(planeW, planeH);
-    const backMat = new THREE.MeshStandardMaterial({
-      map: backTex,
-      transparent: true,
-      alphaTest: 0.05,
-      roughness: 0.55,
-      metalness: 0.08,
-      side: THREE.FrontSide,
-    });
     const backMesh = new THREE.Mesh(backGeo, backMat);
-    backMesh.position.set(0, 0, -halfDepth);
-    backMesh.rotation.y = Math.PI; // Face 180 degrees backwards
+    backMesh.rotation.y = Math.PI;
     characterRoot.add(backMesh);
 
-    // 4. Volumetric Depth & Side/Top Profiles:
-    const hairColor = new THREE.Color(0x131417);
-    const jacketColor = new THREE.Color(0x111215);
-    const skinColor = new THREE.Color(0xebb494);
+    // Load textures & sculpt 3D relief heightmaps directly from each silhouette
+    const loader = new THREE.TextureLoader();
+    let frontRelief: ReliefAnalysis | null = null;
+    let backRelief: ReliefAnalysis | null = null;
+    let isDisposed = false;
 
-    // Head volume slab (hair sides and crown)
-    const headDepthGeo = new THREE.CylinderGeometry(1.22, 1.25, 1.8, 24, 1, false, -Math.PI / 2, Math.PI * 2);
-    headDepthGeo.scale(1.05, 1.0, halfDepth * 1.8);
-    const hairMat = new THREE.MeshStandardMaterial({
-      color: hairColor,
-      roughness: 0.6,
-      metalness: 0.15,
+    const syncHorizontalAlignment = () => {
+      if (!frontRelief || !backRelief) return;
+      // Mirror-align rear center to match front center in character X coordinates
+      const deltaX = (frontRelief.centerXNorm - (1 - backRelief.centerXNorm)) * planeW;
+      backMesh.position.x = deltaX;
+    };
+
+    const frontTex = loader.load(frontPortrait, (tex) => {
+      if (isDisposed) return;
+      tex.colorSpace = THREE.SRGBColorSpace;
+      tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+      frontMat.map = tex;
+      frontMat.needsUpdate = true;
+
+      if (tex.image instanceof HTMLImageElement) {
+        frontRelief = analyzePortraitRelief(tex.image, gridSegs);
+        if (frontRelief) {
+          applyReliefToPlaneGeometry(frontGeo, frontRelief, planeH, planeW);
+          syncHorizontalAlignment();
+        }
+      }
+    });
+    frontTex.colorSpace = THREE.SRGBColorSpace;
+    frontMat.map = frontTex;
+
+    const backTex = loader.load(backPortrait, (tex) => {
+      if (isDisposed) return;
+      tex.colorSpace = THREE.SRGBColorSpace;
+      tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+      backMat.map = tex;
+      backMat.needsUpdate = true;
+
+      if (tex.image instanceof HTMLImageElement) {
+        backRelief = analyzePortraitRelief(tex.image, gridSegs);
+        if (backRelief) {
+          applyReliefToPlaneGeometry(backGeo, backRelief, planeH, planeW);
+          syncHorizontalAlignment();
+        }
+      }
+    });
+    backTex.colorSpace = THREE.SRGBColorSpace;
+    backMat.map = backTex;
+
+    // Subtle floating glow halo beneath character
+    const auraGeo = new THREE.RingGeometry(0.95, 1.45, 48);
+    const auraMat = new THREE.MeshBasicMaterial({
+      color: 0x8b5cf6,
+      transparent: true,
+      opacity: 0.14,
       side: THREE.DoubleSide,
     });
-    const headDepthMesh = new THREE.Mesh(headDepthGeo, hairMat);
-    headDepthMesh.position.set(0, 0.42, 0);
-    characterRoot.add(headDepthMesh);
+    const auraMesh = new THREE.Mesh(auraGeo, auraMat);
+    auraMesh.rotation.x = Math.PI / 2;
+    auraMesh.position.y = -1.78;
+    characterRoot.add(auraMesh);
 
-    // Top hair crown (rounded dome on top)
-    const topCrownGeo = new THREE.SphereGeometry(1.24, 24, 12, 0, Math.PI * 2, 0, Math.PI / 2);
-    topCrownGeo.scale(1.04, 0.45, halfDepth * 1.7);
-    const topCrownMesh = new THREE.Mesh(topCrownGeo, hairMat);
-    topCrownMesh.position.set(0, 1.3, 0);
-    characterRoot.add(topCrownMesh);
-
-    // Torso & blazer side depth
-    const torsoDepthGeo = new THREE.BoxGeometry(2.35, 1.45, halfDepth * 1.7);
-    const jacketMat = new THREE.MeshStandardMaterial({
-      color: jacketColor,
-      roughness: 0.75,
-      metalness: 0.05,
-    });
-    const torsoDepthMesh = new THREE.Mesh(torsoDepthGeo, jacketMat);
-    torsoDepthMesh.position.set(0, -1.05, 0);
-    characterRoot.add(torsoDepthMesh);
-
-    // Left Profile 3D Hair Tufts
-    const leftTuftGroup = new THREE.Group();
-    const tuftGeo1 = new THREE.ConeGeometry(0.35, 1.1, 12);
-    tuftGeo1.rotateZ(0.45);
-    const leftTuft1 = new THREE.Mesh(tuftGeo1, hairMat);
-    leftTuft1.position.set(-1.26, 0.35, -0.02);
-    leftTuftGroup.add(leftTuft1);
-
-    const tuftGeo2 = new THREE.ConeGeometry(0.28, 0.9, 12);
-    tuftGeo2.rotateZ(0.25);
-    const leftTuft2 = new THREE.Mesh(tuftGeo2, hairMat);
-    leftTuft2.position.set(-1.22, 0.05, 0.03);
-    leftTuftGroup.add(leftTuft2);
-    characterRoot.add(leftTuftGroup);
-
-    // Right Profile 3D Hair Tufts & Thinking Arm
-    const rightTuftGroup = new THREE.Group();
-    const rightTuftGeo1 = new THREE.ConeGeometry(0.35, 1.1, 12);
-    rightTuftGeo1.rotateZ(-0.45);
-    const rightTuft1 = new THREE.Mesh(rightTuftGeo1, hairMat);
-    rightTuft1.position.set(1.26, 0.35, -0.02);
-    rightTuftGroup.add(rightTuft1);
-
-    const rightTuftGeo2 = new THREE.ConeGeometry(0.28, 0.9, 12);
-    rightTuftGeo2.rotateZ(-0.25);
-    const rightTuft2 = new THREE.Mesh(rightTuftGeo2, hairMat);
-    rightTuft2.position.set(1.22, 0.05, 0.03);
-    rightTuftGroup.add(rightTuft2);
-    characterRoot.add(rightTuftGroup);
-
-    // Right Arm Thinking Pose
-    const armGroup = new THREE.Group();
-    const armGeo = new THREE.CylinderGeometry(0.14, 0.17, 0.95, 12);
-    armGeo.rotateZ(0.85);
-    armGeo.rotateX(-0.35);
-    const armMesh = new THREE.Mesh(armGeo, jacketMat);
-    armMesh.position.set(0.65, -0.6, halfDepth * 1.25);
-    armGroup.add(armMesh);
-
-    const handGeo = new THREE.SphereGeometry(0.16, 16, 12);
-    handGeo.scale(1.1, 1.4, 0.85);
-    const handMat = new THREE.MeshStandardMaterial({
-      color: skinColor,
-      roughness: 0.55,
-      metalness: 0.05,
-    });
-    const handMesh = new THREE.Mesh(handGeo, handMat);
-    handMesh.position.set(0.08, -0.22, halfDepth * 1.5);
-    armGroup.add(handMesh);
-    characterRoot.add(armGroup);
-
-    // 5. Interactive Drag & 360-Degree Controls State
-    let isDragging = false;
-    let prevPointerX = 0;
-    let prevPointerY = 0;
-    let velX = 0;
-    let velY = 0;
-    let targetRotY = 0;
-    let targetRotX = 0;
-    let mouseHoverX = 0;
-    let mouseHoverY = 0;
-    let isHovering = false;
-
-    // Reset handler exposed to React
-    sceneStateRef.current.resetToFront = () => {
-      const turns = Math.round(targetRotY / (Math.PI * 2));
-      targetRotY = turns * Math.PI * 2;
-      targetRotX = 0;
-      velX = 0;
-      velY = 0;
-      setHasRotated(false);
+    const handleResize = () => {
+      if (!container) return;
+      const w = getWidth();
+      const h = getHeight();
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix();
+      renderer.setSize(w, h);
     };
 
-    // Pointer events
-    const onPointerDown = (e: PointerEvent) => {
-      isDragging = true;
-      setIsInteracting(true);
-      prevPointerX = e.clientX;
-      prevPointerY = e.clientY;
-      velX = 0;
-      velY = 0;
-      try {
-        (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
-      } catch {
-        // Safe fallback
-      }
-    };
+    const ro = new ResizeObserver(handleResize);
+    ro.observe(container);
 
-    const onPointerMove = (e: PointerEvent) => {
-      if (isDragging) {
-        const dx = e.clientX - prevPointerX;
-        const dy = e.clientY - prevPointerY;
-        prevPointerX = e.clientX;
-        prevPointerY = e.clientY;
-
-        const sensitivity = 0.0075;
-        velX = dx * sensitivity;
-        velY = dy * sensitivity;
-
-        targetRotY += velX;
-        targetRotX = Math.max(-0.65, Math.min(0.65, targetRotX + velY));
-
-        setHasRotated(true);
-      } else {
-        const rect = container.getBoundingClientRect();
-        if (rect.width > 0 && rect.height > 0) {
-          const nx = ((e.clientX - rect.left) / rect.width) * 2 - 1;
-          const ny = -(((e.clientY - rect.top) / rect.height) * 2 - 1);
-          mouseHoverX = nx * 0.16;
-          mouseHoverY = ny * 0.12;
-          isHovering = true;
-        }
-      }
-    };
-
-    const onPointerUp = (e: PointerEvent) => {
-      if (isDragging) {
-        isDragging = false;
-        setIsInteracting(false);
-        try {
-          (e.target as HTMLElement).releasePointerCapture?.(e.pointerId);
-        } catch {
-          // Safe fallback
-        }
-      }
-    };
-
-    const onPointerLeave = () => {
-      if (isDragging) {
-        isDragging = false;
-        setIsInteracting(false);
-      }
-      isHovering = false;
-    };
-
-    canvas.addEventListener("pointerdown", onPointerDown);
-    window.addEventListener("pointermove", onPointerMove);
-    window.addEventListener("pointerup", onPointerUp);
-    canvas.addEventListener("pointerleave", onPointerLeave);
-
-    // 6. Resize Observer
-    const resizeObserver = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        const { width: w, height: h } = entry.contentRect;
-        if (w > 0 && h > 0) {
-          camera.aspect = w / h;
-          camera.updateProjectionMatrix();
-          renderer.setSize(w, h);
-        }
-      }
-    });
-    resizeObserver.observe(container);
-
-    // 7. Animation Loop
+    let lastFrameTime = performance.now();
+    let elapsed = 0;
     let animId = 0;
-    const clock = new THREE.Clock();
+    let lastShownAngle = "";
 
     const animate = () => {
       animId = requestAnimationFrame(animate);
-      clock.getDelta();
-      const time = clock.getElapsedTime();
+      const now = performance.now();
+      const dt = Math.min((now - lastFrameTime) / 1000, 0.05);
+      lastFrameTime = now;
+      elapsed += dt;
 
-      // Inertia damping after drag release
-      if (!isDragging) {
-        targetRotY += velX;
-        targetRotX = Math.max(-0.65, Math.min(0.65, targetRotX + velY));
+      if (!pointerDown.current) {
+        // Momentum decay
+        rotY.current += velY.current;
+        rotX.current += velX.current;
+        velY.current *= 0.94;
+        velX.current *= 0.92;
 
-        velX *= 0.92;
-        velY *= 0.92;
-
-        if (Math.abs(velX) < 0.0001) velX = 0;
-        if (Math.abs(velY) < 0.0001) velY = 0;
+        // Gentle studio turntable oscillation until user takes manual control
+        if (!hasInteracted && Math.abs(velY.current) < 0.0005) {
+          rotY.current = Math.sin(elapsed * 0.7) * 0.24;
+        }
       }
 
-      // Smooth interpolation toward target rotation
-      const baseTargetY = targetRotY + (isHovering && !isDragging ? mouseHoverX : 0);
-      const baseTargetX = targetRotX + (isHovering && !isDragging ? -mouseHoverY : 0);
+      // Clamp vertical pitch from bottom upward view through full Top profile
+      rotX.current = Math.max(-0.4, Math.min(1.15, rotX.current));
 
-      characterRoot.rotation.y += (baseTargetY - characterRoot.rotation.y) * 0.12;
-      characterRoot.rotation.x += (baseTargetX - characterRoot.rotation.x) * 0.12;
+      characterRoot.rotation.y = rotY.current;
+      characterRoot.rotation.x = rotX.current;
+      characterRoot.position.y = Math.sin(elapsed * 2.0) * 0.04;
 
-      // Subtle breathing float bobbing
-      const idleBob = Math.sin(time * 2.0) * 0.05;
-      characterRoot.position.y = idleBob;
+      const degY = (((rotY.current * 180) / Math.PI) % 360 + 360) % 360;
+      const degX = (rotX.current * 180) / Math.PI;
+      let profile = "Front";
+      if (degX > 42) {
+        profile = "Top Profile";
+      } else if (degY >= 45 && degY < 135) {
+        profile = "Left Profile";
+      } else if (degY >= 135 && degY < 225) {
+        profile = "Back Profile";
+      } else if (degY >= 225 && degY < 315) {
+        profile = "Right Profile";
+      } else {
+        profile = "Front Profile";
+      }
 
-      // Calculate current yaw in degrees (0 to 360)
-      const normalizedYaw = ((characterRoot.rotation.y % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
-      const deg = Math.round((normalizedYaw * 180) / Math.PI);
-      setCurrentYawDeg(deg);
+      const nextLabel = `${profile} (${Math.round(degY)}°)`;
+      if (nextLabel !== lastShownAngle) {
+        lastShownAngle = nextLabel;
+        setAngleLabel(nextLabel);
+      }
 
       renderer.render(scene, camera);
     };
 
     animate();
 
-    // Cleanup
     return () => {
+      isDisposed = true;
       cancelAnimationFrame(animId);
-      resizeObserver.disconnect();
-      canvas.removeEventListener("pointerdown", onPointerDown);
-      window.removeEventListener("pointermove", onPointerMove);
-      window.removeEventListener("pointerup", onPointerUp);
-      canvas.removeEventListener("pointerleave", onPointerLeave);
-
+      ro.disconnect();
+      frontGeo.dispose();
+      backGeo.dispose();
+      auraGeo.dispose();
+      frontMat.dispose();
+      backMat.dispose();
+      auraMat.dispose();
       frontTex.dispose();
       backTex.dispose();
-      frontGeo.dispose();
-      frontMat.dispose();
-      backGeo.dispose();
-      backMat.dispose();
-      headDepthGeo.dispose();
-      hairMat.dispose();
-      topCrownGeo.dispose();
-      torsoDepthGeo.dispose();
-      jacketMat.dispose();
-      tuftGeo1.dispose();
-      tuftGeo2.dispose();
-      rightTuftGeo1.dispose();
-      rightTuftGeo2.dispose();
-      armGeo.dispose();
-      handGeo.dispose();
-      handMat.dispose();
       renderer.dispose();
+      if (renderer.domElement.parentNode === container) {
+        container.removeChild(renderer.domElement);
+      }
     };
-  }, [isClient]);
+  }, [hasInteracted]);
 
-  const handleReset = useCallback(() => {
-    sceneStateRef.current.resetToFront?.();
-  }, []);
+  if (hasFailed) {
+    return fallback;
+  }
 
-  const getProfileLabel = (deg: number) => {
-    if (deg >= 335 || deg < 25) return "Front Profile";
-    if (deg >= 25 && deg < 65) return "Left 3/4 Profile";
-    if (deg >= 65 && deg < 115) return "Left Profile";
-    if (deg >= 115 && deg < 155) return "Left Rear Profile";
-    if (deg >= 155 && deg < 205) return "Back Profile";
-    if (deg >= 205 && deg < 245) return "Right Rear Profile";
-    if (deg >= 245 && deg < 295) return "Right Profile";
-    return "Right 3/4 Profile";
+  const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    pointerDown.current = true;
+    setIsDragging(true);
+    setHasInteracted(true);
+    lastX.current = e.clientX;
+    lastY.current = e.clientY;
+    velY.current = 0;
+    velX.current = 0;
+    e.currentTarget.setPointerCapture(e.pointerId);
+  };
+
+  const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!pointerDown.current) return;
+    const dx = e.clientX - lastX.current;
+    const dy = e.clientY - lastY.current;
+    lastX.current = e.clientX;
+    lastY.current = e.clientY;
+
+    const sensY = 0.011;
+    const sensX = 0.008;
+    rotY.current += dx * sensY;
+    rotX.current += dy * sensX;
+    velY.current = dx * sensY * 0.45;
+    velX.current = dy * sensX * 0.35;
+  };
+
+  const onPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    pointerDown.current = false;
+    setIsDragging(false);
+    if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    }
+  };
+
+  const handleReset = () => {
+    rotY.current = 0;
+    rotX.current = 0.05;
+    velY.current = 0;
+    velX.current = 0;
+    setHasInteracted(false);
   };
 
   return (
-    <div
-      ref={containerRef}
-      className="relative flex aspect-[783/768] w-full items-center justify-center select-none"
-    >
-      {/* Fallback image: visible during SSR, before 3D loads, or if WebGL is disabled */}
-      {(!isClient || !webglAvailable || !isReady) && (
-        <img
-          src={frontPortrait}
-          alt="Ashwin portfolio portrait"
-          className="h-full w-full object-contain"
-        />
-      )}
+    <div className="relative flex w-full select-none flex-col items-center">
+      <div
+        ref={mountRef}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerCancel={onPointerUp}
+        onDoubleClick={handleReset}
+        className={`relative aspect-square w-full touch-none transition-transform duration-150 ${
+          isDragging ? "cursor-grabbing" : "cursor-grab"
+        }`}
+        aria-label="Interactive 3D character model of Ashwin. Drag to rotate 360 degrees or tilt for top profile."
+        role="img"
+      />
 
-      {/* Interactive WebGL Canvas */}
-      {webglAvailable && (
-        <canvas
-          ref={canvasRef}
-          className={`h-full w-full touch-none ${
-            isInteracting ? "cursor-grabbing" : "cursor-grab"
-          }`}
-          style={{ display: isClient && isReady ? "block" : "none" }}
-          aria-label="3D Interactive character - drag to rotate 360 degrees"
-        />
-      )}
-
-      {/* Floating 360° Interactive Control Pill */}
-      {isClient && webglAvailable && isReady && (
-        <div className="pointer-events-none absolute bottom-1 left-1/2 flex -translate-x-1/2 items-center gap-2">
-          <div className="pointer-events-auto flex items-center gap-2 rounded-full border border-white/15 bg-black/70 px-3.5 py-1.5 shadow-lg backdrop-blur-md transition-all duration-300 hover:border-white/30 hover:bg-black/85">
-            <Rotate3D className="h-3.5 w-3.5 text-primary animate-pulse" />
-            <span className="text-[11px] font-medium tracking-wide text-white/90">
-              {getProfileLabel(currentYawDeg)} ({currentYawDeg}°)
-            </span>
-            {hasRotated && (
-              <button
-                type="button"
-                onClick={handleReset}
-                className="ml-1 flex items-center gap-1 rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-semibold text-white transition-colors hover:bg-white/25 active:scale-95"
-                title="Reset to Front Profile"
-              >
-                <RotateCcw className="h-2.5 w-2.5" />
-                Reset
-              </button>
-            )}
-          </div>
-        </div>
-      )}
+      {/* Interactive Status Pill */}
+      <button
+        type="button"
+        onClick={handleReset}
+        title="Click or double-click canvas to reset orientation"
+        className="pointer-events-auto -mt-3 flex items-center gap-2 rounded-full border border-white/15 bg-black/75 px-3.5 py-1 text-[10px] font-medium uppercase tracking-widest text-foreground/80 backdrop-blur-md transition-colors hover:border-purple-400/50 hover:text-white sm:text-[11px]"
+      >
+        <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-purple-400" />
+        <span>{hasInteracted ? angleLabel : "360° 3D · Drag to Rotate"}</span>
+      </button>
     </div>
-  );
-}
-
-// Export wrapped in ErrorBoundary to guarantee zero page crash
-export function Hero3DCharacter() {
-  return (
-    <ThreeErrorBoundary
-      fallback={
-        <div className="relative flex aspect-[783/768] w-full items-center justify-center select-none">
-          <img
-            src={frontPortrait}
-            alt="Ashwin portfolio portrait"
-            className="h-full w-full object-contain"
-          />
-        </div>
-      }
-    >
-      <InnerHero3DCharacter />
-    </ThreeErrorBoundary>
   );
 }
