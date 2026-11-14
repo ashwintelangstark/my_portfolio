@@ -1,12 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { AboutSection, FeaturedProjects, Footer, Hero, Marquee } from "@/components/portfolio";
+import { AboutSection, AwardsSection, FeaturedProjects, Footer, Hero, Marquee } from "@/components/portfolio";
 
 export const Route = createFileRoute("/")({
   head: () => ({ meta: [
     { title: "Ashwin — AI & Robotics Engineer" },
-    { name: "description", content: "Explore Ashwin's AI, robotics, computer vision and engineering projects." },
+    { name: "description", content: "Explore Ashwin's AI, robotics, computer vision, engineering projects, technical certifications and awards." },
     { property: "og:title", content: "Ashwin — AI & Robotics Engineer" },
-    { property: "og:description", content: "Explore Ashwin's AI, robotics, computer vision and engineering projects." },
+    { property: "og:description", content: "Explore Ashwin's AI, robotics, computer vision, engineering projects, technical certifications and awards." },
     { property: "og:type", content: "website" },
     { name: "twitter:card", content: "summary_large_image" },
   ] }),
@@ -14,5 +14,5 @@ export const Route = createFileRoute("/")({
 });
 
 function Index() {
-  return <main className="overflow-x-clip bg-background"><Hero /><Marquee /><AboutSection /><FeaturedProjects /><Footer /></main>;
+  return <main className="overflow-x-clip bg-background"><Hero /><Marquee /><AboutSection /><FeaturedProjects /><AwardsSection /><Footer /></main>;
 }

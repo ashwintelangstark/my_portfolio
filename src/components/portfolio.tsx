@@ -4,6 +4,7 @@ import { motion, useScroll, useTransform } from "framer-motion";
 import { ArrowDownRight, ArrowLeft, ArrowUpRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { projects } from "@/lib/portfolio-data";
+import { technicalCertificates, awardsList } from "@/lib/awards-data";
 import portrait from "@/assets/ashwin-portrait.png";
 import moon from "@/assets/moon.png.asset.json";
 import object from "@/assets/object.png.asset.json";
@@ -25,6 +26,7 @@ export function Nav({ className = "" }: { className?: string }) {
     <Link to="/" aria-label="Back to home" title="Back to home" className="flex shrink-0 items-center gap-1 transition-opacity duration-200 hover:opacity-70"><ArrowLeft aria-hidden="true" className="size-4 md:size-5" /><span className="hidden sm:inline">Home</span></Link>
     <Link to="/about" className="transition-opacity duration-200 hover:opacity-70">About</Link>
     <Link to="/projects" className="transition-opacity duration-200 hover:opacity-70">Projects</Link>
+    <Link to="/awards" className="transition-opacity duration-200 hover:opacity-70"><span className="md:hidden">Awards</span><span className="hidden md:inline">Awards & Certifications</span></Link>
     <Link to="/contact" className="transition-opacity duration-200 hover:opacity-70">Contact</Link>
   </nav>;
 }
@@ -143,4 +145,182 @@ export function ProjectIndex() {
   return <section className="bg-background px-5 py-20 text-foreground sm:px-8 sm:py-24 md:px-10 md:py-32"><FadeIn><h1 className="mb-16 text-center text-[clamp(3rem,12vw,160px)] font-black uppercase leading-none text-white sm:mb-20 md:mb-28">Projects</h1></FadeIn><div className="mx-auto max-w-5xl">{projects.map((project, i) => <FadeIn key={project.name} delay={Math.min(i * 0.03, 0.25)}><article id={project.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/-$/, "")} className="scroll-mt-8 border-b border-border py-8 sm:py-10 md:py-12"><div className="flex gap-5 sm:gap-10 md:gap-16"><span className="w-[19%] shrink-0 text-[clamp(3rem,10vw,140px)] font-black leading-none text-white">{String(i + 1).padStart(2, "0")}</span><div className="min-w-0 flex-1"><p className="mb-3 text-xs font-medium uppercase tracking-wider text-foreground/60">{project.type} / {project.year}</p><h2 className="mb-4 text-[clamp(1rem,2.2vw,2.1rem)] font-medium uppercase leading-tight text-white">{project.name}</h2><img src={project.image} alt={`${project.name} conceptual visual reference`} loading="lazy" width={1200} height={800} className="mb-5 aspect-[16/8] w-full rounded-[28px] object-cover sm:rounded-[40px]" /><p className="max-w-2xl text-[clamp(.85rem,1.6vw,1.25rem)] font-light leading-relaxed text-foreground/80">{project.description}</p><p className="mt-4 text-xs font-medium uppercase tracking-wider text-foreground/60">{project.details}</p></div></div></article></FadeIn>)}</div></section>;
 }
 
-export function Footer() { return <footer className="flex flex-wrap items-center justify-between gap-4 bg-background px-6 py-8 text-xs font-light uppercase tracking-widest md:px-10"><Link to="/" className="font-black text-lg">ASHWIN</Link><span>AI · Robotics · Engineering</span><Link to="/contact" className="transition-opacity hover:opacity-70">Get in touch ↗</Link></footer>; }
+export function AwardsSection({ full = false }: { full?: boolean }) {
+  return (
+    <section id="awards" className="relative z-10 bg-background px-5 py-20 text-foreground sm:px-8 sm:py-24 md:px-10 md:py-32">
+      <div className="mx-auto max-w-7xl">
+        <FadeIn>
+          <div className="mb-14 text-center sm:mb-20">
+            <span className="mb-3 block text-xs font-semibold uppercase tracking-widest text-foreground/60 sm:text-sm">
+              Recognition · Technical Credentials · Literary Honours
+            </span>
+            <h2 className="hero-heading text-[clamp(2.5rem,8vw,120px)] font-black uppercase leading-none text-white">
+              Awards & Certifications
+            </h2>
+            <p className="mx-auto mt-6 max-w-3xl text-sm font-light leading-relaxed text-foreground/80 sm:text-base md:text-lg">
+              A dual showcase of professional AI certifications from Anthropic's Claude Academy—reflecting agentic engineering, model evaluation, and tool integration—alongside published literature awards and global readership recognitions.
+            </p>
+          </div>
+        </FadeIn>
+
+        {/* Technical Certifications */}
+        <div id="technical-certifications" className="mb-24 scroll-mt-12 sm:mb-32">
+          <FadeIn>
+            <div className="mb-10 flex flex-wrap items-end justify-between gap-4 border-b border-border pb-6">
+              <div>
+                <span className="text-xs font-semibold uppercase tracking-widest text-foreground/60">
+                  Anthropic AI Engineering
+                </span>
+                <h3 className="mt-1 text-2xl font-bold uppercase text-white sm:text-3xl md:text-4xl">
+                  Claude Academy Certifications
+                </h3>
+              </div>
+              <span className="rounded-full border border-border px-4 py-1.5 text-xs font-medium uppercase tracking-wider text-foreground/70">
+                20 Technical Certifications
+              </span>
+            </div>
+          </FadeIn>
+
+          <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
+            {technicalCertificates.map((cert, index) => (
+              <FadeIn key={cert.id} delay={Math.min(index * 0.03, 0.25)}>
+                <article className="flex h-full flex-col justify-between rounded-[32px] border border-border bg-card/40 p-6 sm:p-8 transition-colors duration-200 hover:border-foreground/40">
+                  <div>
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-2xl font-black text-white/90 sm:text-3xl">
+                        {String(index + 1).padStart(2, "0")}
+                      </span>
+                      <span className="text-[10px] font-semibold uppercase tracking-wider text-foreground/60 sm:text-xs">
+                        {cert.issuer} · {cert.date}
+                      </span>
+                    </div>
+
+                    <h4 className="mt-4 text-lg font-medium leading-snug text-white sm:text-xl md:text-2xl">
+                      {cert.title}
+                    </h4>
+
+                    <div className="mt-4 rounded-2xl border border-border/40 bg-background/50 p-4 sm:p-5">
+                      <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-foreground/50 sm:text-xs">
+                        Project Application & Impact
+                      </span>
+                      <p className="text-xs font-light leading-relaxed text-foreground/90 sm:text-sm md:text-base">
+                        {cert.projectImpact}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="mt-6 overflow-hidden rounded-2xl border border-border/40 bg-black/60 p-2 sm:p-3">
+                    <img
+                      src={cert.image}
+                      alt={`${cert.title} Certificate Badge`}
+                      loading="lazy"
+                      width={792}
+                      height={580}
+                      className="h-auto w-full rounded-xl object-contain"
+                    />
+                  </div>
+                </article>
+              </FadeIn>
+            ))}
+          </div>
+        </div>
+
+        {/* Honours & Awards (Alphabetical) */}
+        <div id="honours-awards" className="scroll-mt-12">
+          <FadeIn>
+            <div className="mb-10 flex flex-wrap items-end justify-between gap-4 border-b border-border pb-6">
+              <div>
+                <span className="text-xs font-semibold uppercase tracking-widest text-foreground/60">
+                  Published Literature & Book Outreach
+                </span>
+                <h3 className="mt-1 text-2xl font-bold uppercase text-white sm:text-3xl md:text-4xl">
+                  Honours & Literary Awards
+                </h3>
+              </div>
+              <span className="rounded-full border border-border px-4 py-1.5 text-xs font-medium uppercase tracking-wider text-foreground/70">
+                Alphabetical Listing
+              </span>
+            </div>
+          </FadeIn>
+
+          <div className="space-y-16 sm:space-y-24">
+            {awardsList.map((award, index) => (
+              <FadeIn key={award.id} delay={Math.min(index * 0.05, 0.2)}>
+                <article className="rounded-[40px] border border-border bg-card/30 p-6 sm:p-10 md:p-12">
+                  <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/60 pb-6">
+                    <div className="flex items-center gap-4">
+                      <span className="text-3xl font-black text-white sm:text-4xl md:text-5xl">
+                        {String(index + 1).padStart(2, "0")}
+                      </span>
+                      <div>
+                        <span className="block text-[10px] font-semibold uppercase tracking-widest text-foreground/60 sm:text-xs">
+                          {award.organization} · {award.year}
+                        </span>
+                        <span className="text-xs font-medium uppercase tracking-wider text-foreground/80 sm:text-sm">
+                          {award.category}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-6 max-w-4xl">
+                    <h4 className="text-xl font-bold uppercase leading-tight text-white sm:text-2xl md:text-3xl">
+                      {award.title}
+                    </h4>
+
+                    <div className="mt-4 rounded-2xl border border-border/40 bg-background/50 p-4 sm:p-6">
+                      <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-foreground/50 sm:text-xs">
+                        Why Presented
+                      </span>
+                      <p className="text-xs font-light leading-relaxed text-foreground/90 sm:text-sm md:text-base">
+                        {award.presentationReason}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Full image and video presentation */}
+                  <div className="mt-8 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-2">
+                    {award.media.map((item, mIdx) => (
+                      <div
+                        key={mIdx}
+                        className="flex flex-col overflow-hidden rounded-[24px] border border-border/60 bg-black/60 p-3 sm:p-4"
+                      >
+                        <div className="mb-3 flex items-center justify-between px-1 text-[11px] font-medium uppercase tracking-wider text-foreground/60">
+                          <span className="truncate pr-2">{item.title}</span>
+                          <span className="rounded bg-white/10 px-2 py-0.5 text-[9px] text-white shrink-0">
+                            {item.type}
+                          </span>
+                        </div>
+
+                        {item.type === "image" ? (
+                          <img
+                            src={item.src}
+                            alt={item.alt || item.title}
+                            loading="lazy"
+                            className="h-auto max-h-[540px] w-full rounded-xl object-contain bg-black/40"
+                          />
+                        ) : (
+                          <video
+                            src={item.src}
+                            controls
+                            playsInline
+                            loop
+                            muted
+                            preload="metadata"
+                            className="aspect-video max-h-[540px] w-full rounded-xl object-contain bg-black"
+                          />
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </article>
+              </FadeIn>
+            ))}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+export function Footer() { return <footer className="flex flex-wrap items-center justify-between gap-4 bg-background px-6 py-8 text-xs font-light uppercase tracking-widest md:px-10"><Link to="/" className="font-black text-lg">ASHWIN</Link><span>AI · Robotics · Engineering</span><div className="flex gap-4 sm:gap-6"><Link to="/awards" className="transition-opacity hover:opacity-70">Awards ↗</Link><Link to="/contact" className="transition-opacity hover:opacity-70">Get in touch ↗</Link></div></footer>; }
