@@ -1,13 +1,47 @@
 import * as THREE from "three";
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback, Component, type ReactNode, type ErrorInfo } from "react";
 import frontPortrait from "@/assets/ashwin-portrait.png";
 import backPortrait from "@/assets/ashwin-portrait-back.png";
 import { Rotate3D, RotateCcw } from "lucide-react";
 
-export function Hero3DCharacter() {
+// Robust Error Boundary to guarantee the website never goes blank
+interface ErrorBoundaryProps {
+  children: ReactNode;
+  fallback: ReactNode;
+}
+
+interface ErrorBoundaryState {
+  hasError: boolean;
+}
+
+class ThreeErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  constructor(props: ErrorBoundaryProps) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    console.warn("Hero3DCharacter caught error, falling back:", error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return this.props.fallback;
+    }
+    return this.props.children;
+  }
+}
+
+function InnerHero3DCharacter() {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isClient, setIsClient] = useState(false);
+  const [webglAvailable, setWebglAvailable] = useState(true);
+  const [isReady, setIsReady] = useState(false);
   const [isInteracting, setIsInteracting] = useState(false);
   const [hasRotated, setHasRotated] = useState(false);
   const [currentYawDeg, setCurrentYawDeg] = useState(0);
@@ -27,26 +61,49 @@ export function Hero3DCharacter() {
     const container = containerRef.current;
     const canvas = canvasRef.current;
 
+    // Check if WebGL is supported by the browser (handles Brave shields / strict privacy)
+    try {
+      const testCanvas = document.createElement("canvas");
+      const gl = testCanvas.getContext("webgl") || testCanvas.getContext("experimental-webgl");
+      if (!gl) {
+        console.warn("WebGL is disabled or unsupported in this browser.");
+        setWebglAvailable(false);
+        return;
+      }
+    } catch {
+      setWebglAvailable(false);
+      return;
+    }
+
+    let renderer: THREE.WebGLRenderer;
+    try {
+      renderer = new THREE.WebGLRenderer({
+        canvas,
+        alpha: true,
+        antialias: true,
+        powerPreference: "high-performance",
+      });
+    } catch (e) {
+      console.warn("Failed to create WebGLRenderer:", e);
+      setWebglAvailable(false);
+      return;
+    }
+
     // 1. Scene & Camera setup
     const scene = new THREE.Scene();
+    const width = container.clientWidth || 400;
+    const height = container.clientHeight || 400;
 
-    const camera = new THREE.PerspectiveCamera(38, container.clientWidth / container.clientHeight, 0.1, 100);
+    const camera = new THREE.PerspectiveCamera(38, width / height, 0.1, 100);
     camera.position.set(0, -0.05, 5.2);
 
-    // 2. WebGL Renderer
-    const renderer = new THREE.WebGLRenderer({
-      canvas,
-      alpha: true,
-      antialias: true,
-      powerPreference: "high-performance",
-    });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-    renderer.setSize(container.clientWidth, container.clientHeight);
+    renderer.setSize(width, height);
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.15;
 
-    // 3. Lighting
-    const ambientLight = new THREE.AmbientLight(0xffffff, 1.25);
+    // 2. Lighting setup
+    const ambientLight = new THREE.AmbientLight(0xffffff, 1.3);
     scene.add(ambientLight);
 
     // Key light (front top-right)
@@ -69,12 +126,7 @@ export function Hero3DCharacter() {
     backRimLight2.position.set(3.0, 2.0, -3.5);
     scene.add(backRimLight2);
 
-    // Subtle bottom bounce light
-    const bounceLight = new THREE.DirectionalLight(0x334155, 0.8);
-    bounceLight.position.set(0, -3.0, 1.0);
-    scene.add(bounceLight);
-
-    // 4. Character Hierarchy
+    // 3. Character Hierarchy
     const characterRoot = new THREE.Group();
     scene.add(characterRoot);
 
@@ -83,6 +135,7 @@ export function Hero3DCharacter() {
 
     // Front Portrait Texture
     const frontTex = textureLoader.load(frontPortrait, () => {
+      setIsReady(true);
       renderer.render(scene, camera);
     });
     frontTex.colorSpace = THREE.SRGBColorSpace;
@@ -132,11 +185,7 @@ export function Hero3DCharacter() {
     backMesh.rotation.y = Math.PI; // Face 180 degrees backwards
     characterRoot.add(backMesh);
 
-    // 5. Procedural 3D Volumetric Depth & Side/Top Profiles:
-    // When the character rotates to the sides (90° and 270°) or top:
-    // We add stylized 3D volumetric forms connecting the front and rear silhouettes.
-
-    // A. Volumetric Core (Head and Torso side depth)
+    // 4. Volumetric Depth & Side/Top Profiles:
     const hairColor = new THREE.Color(0x131417);
     const jacketColor = new THREE.Color(0x111215);
     const skinColor = new THREE.Color(0xebb494);
@@ -172,7 +221,7 @@ export function Hero3DCharacter() {
     torsoDepthMesh.position.set(0, -1.05, 0);
     characterRoot.add(torsoDepthMesh);
 
-    // B. Left Profile 3D Hair Tufts (creating authentic chibi wavy silhouette at 90 deg)
+    // Left Profile 3D Hair Tufts
     const leftTuftGroup = new THREE.Group();
     const tuftGeo1 = new THREE.ConeGeometry(0.35, 1.1, 12);
     tuftGeo1.rotateZ(0.45);
@@ -187,7 +236,7 @@ export function Hero3DCharacter() {
     leftTuftGroup.add(leftTuft2);
     characterRoot.add(leftTuftGroup);
 
-    // C. Right Profile 3D Hair Tufts & Thinking Arm Profile
+    // Right Profile 3D Hair Tufts & Thinking Arm
     const rightTuftGroup = new THREE.Group();
     const rightTuftGeo1 = new THREE.ConeGeometry(0.35, 1.1, 12);
     rightTuftGeo1.rotateZ(-0.45);
@@ -202,9 +251,8 @@ export function Hero3DCharacter() {
     rightTuftGroup.add(rightTuft2);
     characterRoot.add(rightTuftGroup);
 
-    // Right Arm 3D Thinking Pose (jutting forward to chin)
+    // Right Arm Thinking Pose
     const armGroup = new THREE.Group();
-    // Forearm angled from elbow towards chin
     const armGeo = new THREE.CylinderGeometry(0.14, 0.17, 0.95, 12);
     armGeo.rotateZ(0.85);
     armGeo.rotateX(-0.35);
@@ -212,7 +260,6 @@ export function Hero3DCharacter() {
     armMesh.position.set(0.65, -0.6, halfDepth * 1.25);
     armGroup.add(armMesh);
 
-    // Hand under chin in 3D space
     const handGeo = new THREE.SphereGeometry(0.16, 16, 12);
     handGeo.scale(1.1, 1.4, 0.85);
     const handMat = new THREE.MeshStandardMaterial({
@@ -225,7 +272,7 @@ export function Hero3DCharacter() {
     armGroup.add(handMesh);
     characterRoot.add(armGroup);
 
-    // 6. Interactive Drag & 360-Degree Controls State
+    // 5. Interactive Drag & 360-Degree Controls State
     let isDragging = false;
     let prevPointerX = 0;
     let prevPointerY = 0;
@@ -236,11 +283,9 @@ export function Hero3DCharacter() {
     let mouseHoverX = 0;
     let mouseHoverY = 0;
     let isHovering = false;
-    let autoRotateProgress = 0;
 
     // Reset handler exposed to React
     sceneStateRef.current.resetToFront = () => {
-      // Find closest full turn (multiples of 2*PI) so it snaps smoothly to front
       const turns = Math.round(targetRotY / (Math.PI * 2));
       targetRotY = turns * Math.PI * 2;
       targetRotX = 0;
@@ -257,7 +302,11 @@ export function Hero3DCharacter() {
       prevPointerY = e.clientY;
       velX = 0;
       velY = 0;
-      (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
+      try {
+        (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
+      } catch {
+        // Safe fallback
+      }
     };
 
     const onPointerMove = (e: PointerEvent) => {
@@ -272,18 +321,18 @@ export function Hero3DCharacter() {
         velY = dy * sensitivity;
 
         targetRotY += velX;
-        // Pitch: allow tilting up and down so user can view top and bottom profiles
         targetRotX = Math.max(-0.65, Math.min(0.65, targetRotX + velY));
 
         setHasRotated(true);
       } else {
-        // Subtle gaze tracking on hover
         const rect = container.getBoundingClientRect();
-        const nx = ((e.clientX - rect.left) / rect.width) * 2 - 1;
-        const ny = -(((e.clientY - rect.top) / rect.height) * 2 - 1);
-        mouseHoverX = nx * 0.16;
-        mouseHoverY = ny * 0.12;
-        isHovering = true;
+        if (rect.width > 0 && rect.height > 0) {
+          const nx = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+          const ny = -(((e.clientY - rect.top) / rect.height) * 2 - 1);
+          mouseHoverX = nx * 0.16;
+          mouseHoverY = ny * 0.12;
+          isHovering = true;
+        }
       }
     };
 
@@ -291,7 +340,11 @@ export function Hero3DCharacter() {
       if (isDragging) {
         isDragging = false;
         setIsInteracting(false);
-        (e.target as HTMLElement).releasePointerCapture?.(e.pointerId);
+        try {
+          (e.target as HTMLElement).releasePointerCapture?.(e.pointerId);
+        } catch {
+          // Safe fallback
+        }
       }
     };
 
@@ -308,26 +361,26 @@ export function Hero3DCharacter() {
     window.addEventListener("pointerup", onPointerUp);
     canvas.addEventListener("pointerleave", onPointerLeave);
 
-    // 7. Resize Observer
+    // 6. Resize Observer
     const resizeObserver = new ResizeObserver((entries) => {
       for (const entry of entries) {
-        const { width, height } = entry.contentRect;
-        if (width > 0 && height > 0) {
-          camera.aspect = width / height;
+        const { width: w, height: h } = entry.contentRect;
+        if (w > 0 && h > 0) {
+          camera.aspect = w / h;
           camera.updateProjectionMatrix();
-          renderer.setSize(width, height);
+          renderer.setSize(w, h);
         }
       }
     });
     resizeObserver.observe(container);
 
-    // 8. Animation Loop
+    // 7. Animation Loop
     let animId = 0;
     const clock = new THREE.Clock();
 
     const animate = () => {
       animId = requestAnimationFrame(animate);
-      const delta = clock.getDelta();
+      clock.getDelta();
       const time = clock.getElapsedTime();
 
       // Inertia damping after drag release
@@ -340,11 +393,6 @@ export function Hero3DCharacter() {
 
         if (Math.abs(velX) < 0.0001) velX = 0;
         if (Math.abs(velY) < 0.0001) velY = 0;
-
-        // Idle floating & subtle organic breathing when undisturbed
-        if (velX === 0 && velY === 0 && !isHovering) {
-          autoRotateProgress += delta;
-        }
       }
 
       // Smooth interpolation toward target rotation
@@ -358,7 +406,7 @@ export function Hero3DCharacter() {
       const idleBob = Math.sin(time * 2.0) * 0.05;
       characterRoot.position.y = idleBob;
 
-      // Calculate current yaw in degrees (0 to 360) for UI feedback
+      // Calculate current yaw in degrees (0 to 360)
       const normalizedYaw = ((characterRoot.rotation.y % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
       const deg = Math.round((normalizedYaw * 180) / Math.PI);
       setCurrentYawDeg(deg);
@@ -377,7 +425,6 @@ export function Hero3DCharacter() {
       window.removeEventListener("pointerup", onPointerUp);
       canvas.removeEventListener("pointerleave", onPointerLeave);
 
-      // Dispose Three.js objects
       frontTex.dispose();
       backTex.dispose();
       frontGeo.dispose();
@@ -404,7 +451,6 @@ export function Hero3DCharacter() {
     sceneStateRef.current.resetToFront?.();
   }, []);
 
-  // Determine current profile name for visual badge
   const getProfileLabel = (deg: number) => {
     if (deg >= 335 || deg < 25) return "Front Profile";
     if (deg >= 25 && deg < 65) return "Left 3/4 Profile";
@@ -421,8 +467,8 @@ export function Hero3DCharacter() {
       ref={containerRef}
       className="relative flex aspect-[783/768] w-full items-center justify-center select-none"
     >
-      {/* SSR / Initial Loading Fallback */}
-      {!isClient && (
+      {/* Fallback image: visible during SSR, before 3D loads, or if WebGL is disabled */}
+      {(!isClient || !webglAvailable || !isReady) && (
         <img
           src={frontPortrait}
           alt="Ashwin portfolio portrait"
@@ -431,17 +477,19 @@ export function Hero3DCharacter() {
       )}
 
       {/* Interactive WebGL Canvas */}
-      <canvas
-        ref={canvasRef}
-        className={`h-full w-full touch-none ${
-          isInteracting ? "cursor-grabbing" : "cursor-grab"
-        }`}
-        style={{ display: isClient ? "block" : "none" }}
-        aria-label="3D Interactive character - drag to rotate 360 degrees"
-      />
+      {webglAvailable && (
+        <canvas
+          ref={canvasRef}
+          className={`h-full w-full touch-none ${
+            isInteracting ? "cursor-grabbing" : "cursor-grab"
+          }`}
+          style={{ display: isClient && isReady ? "block" : "none" }}
+          aria-label="3D Interactive character - drag to rotate 360 degrees"
+        />
+      )}
 
       {/* Floating 360° Interactive Control Pill */}
-      {isClient && (
+      {isClient && webglAvailable && isReady && (
         <div className="pointer-events-none absolute bottom-1 left-1/2 flex -translate-x-1/2 items-center gap-2">
           <div className="pointer-events-auto flex items-center gap-2 rounded-full border border-white/15 bg-black/70 px-3.5 py-1.5 shadow-lg backdrop-blur-md transition-all duration-300 hover:border-white/30 hover:bg-black/85">
             <Rotate3D className="h-3.5 w-3.5 text-primary animate-pulse" />
@@ -463,5 +511,24 @@ export function Hero3DCharacter() {
         </div>
       )}
     </div>
+  );
+}
+
+// Export wrapped in ErrorBoundary to guarantee zero page crash
+export function Hero3DCharacter() {
+  return (
+    <ThreeErrorBoundary
+      fallback={
+        <div className="relative flex aspect-[783/768] w-full items-center justify-center select-none">
+          <img
+            src={frontPortrait}
+            alt="Ashwin portfolio portrait"
+            className="h-full w-full object-contain"
+          />
+        </div>
+      }
+    >
+      <InnerHero3DCharacter />
+    </ThreeErrorBoundary>
   );
 }
