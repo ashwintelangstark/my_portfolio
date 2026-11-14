@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
 import { motion, useScroll, useTransform } from "framer-motion";
-import { ArrowDownRight, ArrowLeft, ArrowUpRight } from "lucide-react";
+import { ArrowDownRight, ArrowUpRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { projects } from "@/lib/portfolio-data";
 import { technicalCertificates, awardsList } from "@/lib/awards-data";
@@ -23,7 +23,7 @@ export function ContactButton() {
 
 export function Nav({ className = "" }: { className?: string }) {
   return <nav aria-label="Main navigation" className={`relative z-30 flex items-center justify-between gap-3 px-6 pt-6 text-sm font-medium uppercase tracking-wider text-foreground md:px-10 md:pt-8 md:text-lg lg:text-[1.4rem] ${className}`}>
-    <Link to="/" aria-label="Back to home" title="Back to home" className="flex shrink-0 items-center gap-1 transition-opacity duration-200 hover:opacity-70"><ArrowLeft aria-hidden="true" className="size-4 md:size-5" /><span className="hidden sm:inline">Home</span></Link>
+    <Link to="/" className="transition-opacity duration-200 hover:opacity-70">Home</Link>
     <Link to="/about" className="transition-opacity duration-200 hover:opacity-70">About</Link>
     <Link to="/projects" className="transition-opacity duration-200 hover:opacity-70">Projects</Link>
     <Link to="/awards" className="transition-opacity duration-200 hover:opacity-70"><span className="md:hidden">Awards</span><span className="hidden md:inline">Awards & Certifications</span></Link>
@@ -323,4 +323,4 @@ export function AwardsSection({ full = false }: { full?: boolean }) {
   );
 }
 
-export function Footer() { return <footer className="flex flex-wrap items-center justify-between gap-4 bg-background px-6 py-8 text-xs font-light uppercase tracking-widest md:px-10"><Link to="/" className="font-black text-lg">ASHWIN</Link><span>AI · Robotics · Engineering</span><div className="flex gap-4 sm:gap-6"><Link to="/awards" className="transition-opacity hover:opacity-70">Awards ↗</Link><Link to="/contact" className="transition-opacity hover:opacity-70">Get in touch ↗</Link></div></footer>; }
+export function Footer() { return <footer className="flex flex-wrap items-center justify-between gap-4 bg-background px-6 py-8 text-xs font-light uppercase tracking-widest md:px-10"><Link to="/" className="font-black text-lg">ASHWIN</Link><span>AI · Robotics · Engineering</span></footer>; }

@@ -12,3 +12,4 @@ export const Route = createFileRoute("/awards")({
   ] }),
   component: () => <main className="overflow-x-clip bg-background"><Nav /><AwardsSection full /><Footer /></main>,
 });
+
